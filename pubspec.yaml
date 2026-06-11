@@ -80,7 +80,6 @@ flutter:
   assets:
     - assets/gifs/
     - assets/images/
-    - assets/icons/
     - assets/svgimages/
 
   # An image asset can refer to one or more resolution-specific "variants", see

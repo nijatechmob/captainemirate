@@ -1,6 +1,7 @@
 import 'dart:async';
-import 'package:location/location.dart';
+import 'package:location/location.dart' hide LocationAccuracy;
 import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 
 class LocationService {
   Location location = Location();
@@ -8,29 +9,34 @@ class LocationService {
 
   /// 📍 GET CURRENT LOCATION
   Future<LatLng?> getCurrentLocation() async {
-    bool serviceEnabled;
-    PermissionStatus permissionGranted;
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
 
-    serviceEnabled = await location.serviceEnabled();
-    if (!serviceEnabled) {
-      serviceEnabled = await location.requestService();
-      if (!serviceEnabled) return null;
-    }
+      if (!serviceEnabled) {
+        return null;
+      }
 
-    permissionGranted = await location.hasPermission();
-    if (permissionGranted == PermissionStatus.denied) {
-      permissionGranted = await location.requestPermission();
-    }
+      LocationPermission permission = await Geolocator.checkPermission();
 
-    if (permissionGranted != PermissionStatus.granted) {
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return null;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15),
+      );
+
+      return LatLng(position.latitude, position.longitude);
+    } catch (e) {
+      print("Location Error: $e");
       return null;
     }
-
-    final data = await location.getLocation();
-
-    if (!_isValid(data.latitude, data.longitude)) return null;
-
-    return LatLng(data.latitude!, data.longitude!);
   }
 
   /// 🔄 LIVE TRACKING
@@ -40,9 +46,7 @@ class LocationService {
     _subscription = location.onLocationChanged.listen((data) {
       if (!_isValid(data.latitude, data.longitude)) return;
 
-      onUpdate(
-        LatLng(data.latitude!, data.longitude!),
-      );
+      onUpdate(LatLng(data.latitude!, data.longitude!));
     });
 
     return _subscription!;
